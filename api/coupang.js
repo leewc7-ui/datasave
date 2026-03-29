@@ -1,25 +1,32 @@
-import crypto from "crypto";
-
 export const config = { runtime: "edge" };
 
 const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY;
 const SECRET_KEY = process.env.COUPANG_SECRET_KEY;
 
-// HMAC 서명 생성
-function generateHmac(method, url, secretKey, accessKey) {
+// Web Crypto API로 HMAC 서명 생성
+async function generateHmac(method, path) {
   const datetime = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-  const message = datetime + method + url;
-  const signature = crypto
-    .createHmac("sha256", secretKey)
-    .update(message)
-    .digest("hex");
+  const message = datetime + method + path;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(SECRET_KEY),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  const hex = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
   return {
-    authorization: `CEA algorithm=HmacSHA256, access-key=${accessKey}, signed-date=${datetime}, signature=${signature}`,
+    authorization: `CEA algorithm=HmacSHA256, access-key=${ACCESS_KEY}, signed-date=${datetime}, signature=${hex}`,
   };
 }
 
 export default async function handler(req) {
-  // CORS 헤더
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -32,11 +39,10 @@ export default async function handler(req) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const endpoint = searchParams.get("endpoint"); // e.g. "revenue", "clicks", "products"
-    const startDate = searchParams.get("startDate"); // YYYY-MM-DD
-    const endDate = searchParams.get("endDate");
+    const endpoint  = searchParams.get("endpoint");
+    const startDate = searchParams.get("startDate");
+    const endDate   = searchParams.get("endDate");
 
-    // 엔드포인트별 쿠팡 API 경로 매핑
     const apiPaths = {
       revenue:  `/v2/providers/affiliate_open_api/apis/openapi/v1/revenue?startDate=${startDate}&endDate=${endDate}`,
       clicks:   `/v2/providers/affiliate_open_api/apis/openapi/v1/clicks?startDate=${startDate}&endDate=${endDate}`,
@@ -50,7 +56,7 @@ export default async function handler(req) {
       });
     }
 
-    const { authorization } = generateHmac("GET", apiPath, SECRET_KEY, ACCESS_KEY);
+    const { authorization } = await generateHmac("GET", apiPath);
 
     const coupangRes = await fetch(`https://api-gateway.coupang.com${apiPath}`, {
       method: "GET",
@@ -61,7 +67,6 @@ export default async function handler(req) {
     });
 
     const data = await coupangRes.json();
-
     return new Response(JSON.stringify(data), {
       status: coupangRes.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
