@@ -225,7 +225,7 @@ function setNav(nav, btn) {
 async function fetchData(endpoint) {
   const start = document.getElementById("startDate").value;
   const end   = document.getElementById("endDate").value;
-  const url = `${BASE_URL}/api/coupang?endpoint=${endpoint}&startDate=${start}&endDate=${end}`;
+        const url = `${BASE_URL}/api/${endpoint}?startDate=${start}&endDate=${end}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${endpoint} API 오류 (${res.status})`);
   return res.json();
