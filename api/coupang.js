@@ -1,88 +1,51 @@
-export const config = { runtime: "edge" };
+import crypto from "node:crypto";
 
-const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY;
-const SECRET_KEY = process.env.COUPANG_SECRET_KEY;
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-async function generateAuthorization(method, url) {
-  const datetime = new Date()
-    .toISOString()
-    .replace(/\.\d{3}Z/, "Z"); // 밀리초 제거
-
-  // 쿠팡 공식 서명 메시지 형식: datetime + method + path?query
-  const message = datetime + method + url;
-
-  const enc = new TextEncoder();
-  const keyData = enc.encode(SECRET_KEY);
-  const msgData = enc.encode(message);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw", keyData,
-    { name: "HMAC", hash: { name: "SHA-256" } },
-    false, ["sign"]
-  );
-
-  const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
-  const signature = Array.from(new Uint8Array(signatureBuffer))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  return `CEA algorithm=HmacSHA256, access-key=${ACCESS_KEY}, signed-date=${datetime}, signature=${signature}`;
-}
-
-export default async function handler(req) {
-  const cors = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: cors });
-  }
+  if (req.method === "OPTIONS") return res.status(204).end();
 
   try {
-    const { searchParams } = new URL(req.url);
-    const endpoint  = searchParams.get("endpoint");
-    const startDate = (searchParams.get("startDate") || "").replace(/-/g, "");
-    const endDate   = (searchParams.get("endDate") || "").replace(/-/g, "");
+    const { endpoint, startDate, endDate } = req.query;
+    const start = (startDate || "").replace(/-/g, "");
+    const end   = (endDate   || "").replace(/-/g, "");
 
-    // 쿠팡 공식 API 문서 기준 경로
+    const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY;
+    const SECRET_KEY = process.env.COUPANG_SECRET_KEY;
+
     const pathMap = {
-      clicks:   `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/clicks?startDate=${startDate}&endDate=${endDate}`,
-      revenue:  `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/commission?startDate=${startDate}&endDate=${endDate}`,
-      products: `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/orders?startDate=${startDate}&endDate=${endDate}`,
+      clicks:   `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/clicks?startDate=${start}&endDate=${end}`,
+      revenue:  `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/commission?startDate=${start}&endDate=${end}`,
+      products: `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/orders?startDate=${start}&endDate=${end}`,
     };
 
     const apiPath = pathMap[endpoint];
-    if (!apiPath) {
-      return new Response(JSON.stringify({ error: "Unknown endpoint" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
+    if (!apiPath) return res.status(400).json({ error: "Unknown endpoint" });
 
-    const authorization = await generateAuthorization("GET", apiPath);
+    // HMAC 서명 생성
+    const datetime = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+    const message = datetime + "GET" + apiPath;
+    const signature = crypto
+      .createHmac("sha256", SECRET_KEY)
+      .update(message)
+      .digest("hex");
 
-    const res = await fetch(`https://api-gateway.coupang.com${apiPath}`, {
+    const authorization = `CEA algorithm=HmacSHA256, access-key=${ACCESS_KEY}, signed-date=${datetime}, signature=${signature}`;
+
+    const response = await fetch(`https://api-gateway.coupang.com${apiPath}`, {
       method: "GET",
       headers: {
-        "Authorization": authorization,
+        Authorization: authorization,
         "Content-Type": "application/json;charset=UTF-8",
       },
     });
 
-    const text = await res.text();
-
-    // 응답 상태와 함께 반환 (디버깅용 status 포함)
-    return new Response(text, {
-      status: res.status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+    const data = await response.json();
+    return res.status(response.status).json(data);
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+    return res.status(500).json({ error: err.message });
   }
 }
