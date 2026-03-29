@@ -47,7 +47,7 @@ export default async function handler(req) {
     const apiPaths = {
       revenue:  `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/commission?startDate=${startDate}&endDate=${endDate}`,
       clicks:   `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/clicks?startDate=${startDate}&endDate=${endDate}`,
-      products: `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/orders?startDate=${startDate}&endDate=${endDate}`,
+      products: `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/cancels?startDate=${startDate}&endDate=${endDate}`,
     };
 
     const apiPath = apiPaths[endpoint];
