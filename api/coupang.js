@@ -40,8 +40,9 @@ export default async function handler(req) {
   try {
     const { searchParams } = new URL(req.url);
     const endpoint  = searchParams.get("endpoint");
-    const startDate = searchParams.get("startDate");
-    const endDate   = searchParams.get("endDate");
+    // YYYY-MM-DD → YYYYMMdd 형식으로 변환
+    const startDate = (searchParams.get("startDate") || "").replace(/-/g, "");
+    const endDate   = (searchParams.get("endDate") || "").replace(/-/g, "");
 
     const apiPaths = {
       revenue:  `/v2/providers/affiliate_open_api/apis/openapi/v1/reports/commission?startDate=${startDate}&endDate=${endDate}`,
