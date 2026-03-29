@@ -24,10 +24,12 @@ export default async function handler(req, res) {
     const apiPath = pathMap[endpoint];
     if (!apiPath) return res.status(400).json({ error: "Unknown endpoint" });
 
-    // HMAC 서명 생성 (path만 사용, query string 제외)
-    const datetime = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-    const pathOnly = apiPath.split("?")[0]; // query string 제거
-    const message = datetime + "GET" + pathOnly;
+    // HMAC 서명 생성 (기존 작동 방식과 동일하게)
+    const datetime = new Date().toISOString().substr(2, 17)
+      .replace(/:/gi, "").replace(/-/gi, "") + "Z";
+    const queryString = apiPath.split("?")[1] || "";
+    const pathOnly = apiPath.split("?")[0];
+    const message = datetime + "GET" + pathOnly + queryString;
     const signature = crypto
       .createHmac("sha256", SECRET_KEY)
       .update(message)
