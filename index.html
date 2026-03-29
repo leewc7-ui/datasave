@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>쿠팡 파트너스 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #e2e2f0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 200px; height: 100vh;
+    background: #13131f; border-right: 1px solid #1e1e30;
+    padding: 24px 0; display: flex; flex-direction: column;
+  }
+  .logo { padding: 0 20px 24px; border-bottom: 1px solid #1e1e30; margin-bottom: 8px; }
+  .logo-title { font-size: 17px; font-weight: 700; color: #f59e0b; }
+  .logo-sub { font-size: 11px; color: #555570; margin-top: 2px; }
+  .nav-btn {
+    background: transparent; border: none; border-left: 3px solid transparent;
+    color: #666680; padding: 10px 20px; text-align: left; cursor: pointer;
+    font-size: 13px; width: 100%; transition: all 0.15s;
+  }
+  .nav-btn.active { background: #1e1e35; border-left-color: #f59e0b; color: #e2e2f0; font-weight: 600; }
+
+  .main { margin-left: 200px; padding: 28px 32px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 13px; color: #555570; margin-top: 4px; }
+
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .controls input[type="date"] {
+    background: #13131f; border: 1px solid #1e1e30; color: #e2e2f0;
+    padding: 6px 10px; border-radius: 8px; font-size: 12px;
+  }
+  .btn {
+    background: #f59e0b; border: none; color: #0f0f1a; padding: 7px 16px;
+    border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-outline {
+    background: transparent; border: 1px solid #1e1e30; color: #a0a0c0;
+    padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  .card { background: #13131f; border: 1px solid #1e1e30; border-radius: 14px; padding: 18px 20px; }
+  .card-icon { font-size: 20px; margin-bottom: 8px; }
+  .card-label { font-size: 11px; color: #555570; margin-bottom: 4px; }
+  .card-value { font-size: 22px; font-weight: 700; }
+  .card-change { font-size: 12px; margin-top: 4px; }
+  .up { color: #10b981; } .down { color: #f43f5e; }
+
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .chart-box { background: #13131f; border: 1px solid #1e1e30; border-radius: 14px; padding: 20px 22px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: #a0a0c0; margin-bottom: 14px; }
+  .chart-full { background: #13131f; border: 1px solid #1e1e30; border-radius: 14px; padding: 20px 22px; margin-bottom: 18px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { color: #555570; font-weight: 500; padding: 8px 12px; text-align: left; border-bottom: 1px solid #1e1e30; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1a1a28; }
+  tr:hover td { background: #1a1a2a; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #10b98122; color: #10b981; }
+  .badge-yellow { background: #f59e0b22; color: #f59e0b; }
+  .badge-red { background: #f43f5e22; color: #f43f5e; }
+
+  .loading { text-align: center; padding: 40px; color: #555570; font-size: 14px; }
+  .error-box { background: #f43f5e15; border: 1px solid #f43f5e44; border-radius: 10px; padding: 14px 18px; color: #f43f5e; font-size: 13px; margin-bottom: 18px; }
+
+  .api-setup { background: #13131f; border: 1px solid #f59e0b44; border-radius: 14px; padding: 24px; max-width: 500px; margin: 60px auto; }
+  .api-setup h2 { font-size: 16px; margin-bottom: 6px; color: #f59e0b; }
+  .api-setup p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .api-setup input {
+    width: 100%; background: #0f0f1a; border: 1px solid #1e1e30;
+    color: #e2e2f0; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 10px;
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 16px; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-title">🛒 CP Dashboard</div>
+    <div class="logo-sub">쿠팡 파트너스</div>
+  </div>
+  <button class="nav-btn active" onclick="setNav('overview', this)">📊 전체 개요</button>
+  <button class="nav-btn" onclick="setNav('revenue', this)">💰 수익 분석</button>
+  <button class="nav-btn" onclick="setNav('clicks', this)">👆 클릭/전환</button>
+  <button class="nav-btn" onclick="setNav('products', this)">📦 상품별 실적</button>
+</div>
+
+<div class="main" id="main">
+  <!-- API 키 미설정 시 설정 화면 -->
+  <div id="setup-screen" class="api-setup" style="display:none;">
+    <h2>⚙️ Vercel API 주소 설정</h2>
+    <p>배포한 Vercel 프로젝트의 주소를 입력하세요.<br>한 번 입력하면 이 브라우저에 저장돼요.</p>
+    <input id="input-base-url" type="text" placeholder="https://내프로젝트.vercel.app" />
+    <button class="btn" style="width:100%;margin-top:4px;" onclick="saveConfig()">저장하고 시작하기</button>
+  </div>
+
+  <!-- 메인 대시보드 -->
+  <div id="dashboard-screen" style="display:none;">
+    <div class="header">
+      <div>
+        <h1 id="nav-title">전체 개요</h1>
+        <p id="nav-sub">쿠팡 파트너스 실적 분석</p>
+      </div>
+      <div class="controls">
+        <input type="date" id="startDate" />
+        <input type="date" id="endDate" />
+        <button class="btn" onclick="loadAll()">🔄 조회</button>
+        <button class="btn-outline" onclick="resetConfig()">설정 초기화</button>
+      </div>
+    </div>
+
+    <div id="error-area"></div>
+
+    <!-- Summary Cards -->
+    <div class="cards">
+      <div class="card"><div class="card-icon">💰</div><div class="card-label">총 수익</div><div class="card-value" id="c-revenue">-</div><div class="card-change" id="c-revenue-ch"></div></div>
+      <div class="card"><div class="card-icon">👆</div><div class="card-label">총 클릭수</div><div class="card-value" id="c-clicks">-</div><div class="card-change" id="c-clicks-ch"></div></div>
+      <div class="card"><div class="card-icon">🛒</div><div class="card-label">총 주문수</div><div class="card-value" id="c-orders">-</div><div class="card-change" id="c-orders-ch"></div></div>
+      <div class="card"><div class="card-icon">📈</div><div class="card-label">전환율</div><div class="card-value" id="c-cvr">-</div><div class="card-change" id="c-cvr-ch"></div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-full">
+      <div class="chart-title">💰 일별 수익 트렌드</div>
+      <canvas id="revenueChart" height="80"></canvas>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">👆 일별 클릭수</div>
+        <canvas id="clickChart" height="160"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">📊 전환율 추이</div>
+        <canvas id="cvrChart" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- Products Table -->
+    <div class="chart-full">
+      <div class="chart-title">📦 상품별 실적</div>
+      <div id="products-loading" class="loading">데이터를 불러오는 중...</div>
+      <table id="products-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>상품명</th>
+            <th>클릭수</th>
+            <th>주문수</th>
+            <th>전환율</th>
+            <th>수익</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let BASE_URL = "";
+let charts = {};
+
+// ── 초기화 ──────────────────────────────────────
+function init() {
+  BASE_URL = localStorage.getItem("cp_base_url") || "";
+  if (!BASE_URL) {
+    document.getElementById("setup-screen").style.display = "block";
+  } else {
+    showDashboard();
+  }
+  // 날짜 기본값: 최근 30일
+  const end = new Date();
+  const start = new Date(); start.setDate(end.getDate() - 29);
+  document.getElementById("endDate").value = fmt(end);
+  document.getElementById("startDate").value = fmt(start);
+}
+
+function fmt(d) { return d.toISOString().slice(0, 10); }
+
+function saveConfig() {
+  const url = document.getElementById("input-base-url").value.trim().replace(/\/$/, "");
+  if (!url) return alert("주소를 입력해 주세요.");
+  localStorage.setItem("cp_base_url", url);
+  BASE_URL = url;
+  showDashboard();
+}
+
+function resetConfig() {
+  localStorage.removeItem("cp_base_url");
+  location.reload();
+}
+
+function showDashboard() {
+  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("dashboard-screen").style.display = "block";
+  loadAll();
+}
+
+// ── 네비게이션 ───────────────────────────────────
+const navTitles = { overview:"전체 개요", revenue:"수익 분석", clicks:"클릭 / 전환율", products:"상품별 실적" };
+let currentNav = "overview";
+function setNav(nav, btn) {
+  currentNav = nav;
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("nav-title").textContent = navTitles[nav];
+}
+
+// ── API 호출 ─────────────────────────────────────
+async function fetchData(endpoint) {
+  const start = document.getElementById("startDate").value;
+  const end   = document.getElementById("endDate").value;
+  const url = `${BASE_URL}/api/coupang?endpoint=${endpoint}&startDate=${start}&endDate=${end}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${endpoint} API 오류 (${res.status})`);
+  return res.json();
+}
+
+function showError(msg) {
+  document.getElementById("error-area").innerHTML =
+    `<div class="error-box">⚠️ ${msg}<br><small>Vercel 배포 상태 및 API 키 환경변수를 확인해 주세요.</small></div>`;
+}
+function clearError() { document.getElementById("error-area").innerHTML = ""; }
+
+// ── 메인 로드 ────────────────────────────────────
+async function loadAll() {
+  clearError();
+  try {
+    const [rev, clk, prod] = await Promise.all([
+      fetchData("revenue"),
+      fetchData("clicks"),
+      fetchData("products"),
+    ]);
+    renderCards(rev, clk);
+    renderRevenueChart(rev);
+    renderClickChart(clk);
+    renderCvrChart(clk);
+    renderProducts(prod);
+  } catch (e) {
+    showError(e.message);
+    renderDemoData(); // 오류 시 데모 데이터 표시
+  }
+}
+
+// ── 데모 데이터 (API 오류 시 미리보기용) ──────────
+function renderDemoData() {
+  const days = 14;
+  const labels = Array.from({ length: days }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  });
+  const revenues = labels.map(() => Math.floor(Math.random() * 80000 + 20000));
+  const clicks   = labels.map(() => Math.floor(Math.random() * 300 + 100));
+  const orders   = clicks.map(c => Math.floor(c * (Math.random() * 0.05 + 0.02)));
+  const cvrs     = orders.map((o, i) => ((o / clicks[i]) * 100).toFixed(2));
+
+  const totalRev = revenues.reduce((a, b) => a + b, 0);
+  const totalClk = clicks.reduce((a, b) => a + b, 0);
+  const totalOrd = orders.reduce((a, b) => a + b, 0);
+  const totalCvr = ((totalOrd / totalClk) * 100).toFixed(2);
+
+  setText("c-revenue", `₩${totalRev.toLocaleString()}`);
+  setText("c-clicks", totalClk.toLocaleString());
+  setText("c-orders", totalOrd.toLocaleString());
+  setText("c-cvr", `${totalCvr}%`);
+  setChange("c-revenue-ch", "+12.3%");
+  setChange("c-clicks-ch", "+8.1%");
+  setChange("c-orders-ch", "+5.4%");
+  setChange("c-cvr-ch", "-0.3%", false);
+
+  drawLine("revenueChart", labels, [{ label:"수익 (₩)", data: revenues, color:"#f59e0b" }]);
+  drawLine("clickChart",   labels, [{ label:"클릭수", data: clicks, color:"#6366f1" }]);
+  drawLine("cvrChart",     labels, [{ label:"전환율 (%)", data: cvrs, color:"#10b981" }]);
+
+  const demoProducts = [
+    { name: "에어팟 프로 2세대", clicks: 842, orders: 31, cvr: "3.68", revenue: 186000, trend: "up" },
+    { name: "삼성 갤럭시 버즈3", clicks: 614, orders: 18, cvr: "2.93", revenue: 97200, trend: "up" },
+    { name: "애플워치 SE 2세대", clicks: 502, orders: 9,  cvr: "1.79", revenue: 54000, trend: "flat" },
+    { name: "아이패드 미니 7세대", clicks: 389, orders: 5,  cvr: "1.29", revenue: 40000, trend: "down" },
+    { name: "다이슨 에어랩", clicks: 271, orders: 12, cvr: "4.43", revenue: 144000, trend: "up" },
+  ];
+  renderProductTable(demoProducts);
+}
+
+// ── 렌더링 함수들 ────────────────────────────────
+function renderCards(rev, clk) {
+  const totalRev = rev.data?.reduce((a, b) => a + (b.revenue || 0), 0) || 0;
+  const totalClk = clk.data?.reduce((a, b) => a + (b.clicks || 0), 0) || 0;
+  const totalOrd = clk.data?.reduce((a, b) => a + (b.orders || 0), 0) || 0;
+  const cvr = totalClk ? ((totalOrd / totalClk) * 100).toFixed(2) : "0.00";
+  setText("c-revenue", `₩${totalRev.toLocaleString()}`);
+  setText("c-clicks", totalClk.toLocaleString());
+  setText("c-orders", totalOrd.toLocaleString());
+  setText("c-cvr", `${cvr}%`);
+}
+
+function renderRevenueChart(rev) {
+  const labels = rev.data?.map(d => d.date?.slice(5) || "") || [];
+  const values = rev.data?.map(d => d.revenue || 0) || [];
+  drawLine("revenueChart", labels, [{ label:"수익 (₩)", data: values, color:"#f59e0b" }]);
+}
+function renderClickChart(clk) {
+  const labels = clk.data?.map(d => d.date?.slice(5) || "") || [];
+  const values = clk.data?.map(d => d.clicks || 0) || [];
+  drawLine("clickChart", labels, [{ label:"클릭수", data: values, color:"#6366f1" }]);
+}
+function renderCvrChart(clk) {
+  const labels = clk.data?.map(d => d.date?.slice(5) || "") || [];
+  const values = clk.data?.map(d => d.clicks ? ((d.orders/d.clicks)*100).toFixed(2) : 0) || [];
+  drawLine("cvrChart", labels, [{ label:"전환율 (%)", data: values, color:"#10b981" }]);
+}
+function renderProducts(prod) {
+  const items = prod.data?.map(p => ({
+    name: p.productName || p.name || "-",
+    clicks: p.clicks || 0,
+    orders: p.orders || 0,
+    cvr: p.clicks ? ((p.orders/p.clicks)*100).toFixed(2) : "0.00",
+    revenue: p.revenue || 0,
+    trend: "flat"
+  })) || [];
+  renderProductTable(items);
+}
+function renderProductTable(items) {
+  const badge = t => t==="up" ? `<span class="badge badge-green">↑ 상승</span>` : t==="down" ? `<span class="badge badge-red">↓ 하락</span>` : `<span class="badge badge-yellow">→ 유지</span>`;
+  document.getElementById("products-tbody").innerHTML = items.map(p => `
+    <tr>
+      <td>${p.name}</td>
+      <td>${Number(p.clicks).toLocaleString()}</td>
+      <td>${Number(p.orders).toLocaleString()}</td>
+      <td>${p.cvr}%</td>
+      <td>₩${Number(p.revenue).toLocaleString()}</td>
+      <td>${badge(p.trend)}</td>
+    </tr>`).join("");
+  document.getElementById("products-loading").style.display = "none";
+  document.getElementById("products-table").style.display = "table";
+}
+
+// ── 차트 공통 ────────────────────────────────────
+function drawLine(id, labels, datasets) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext("2d");
+  charts[id] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: datasets.map(ds => ({
+        label: ds.label, data: ds.data,
+        borderColor: ds.color, backgroundColor: ds.color + "18",
+        borderWidth: 2.5, pointRadius: 3, tension: 0.4, fill: true,
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#888", font: { size: 12 } } } },
+      scales: {
+        x: { ticks: { color: "#555570", font: { size: 11 } }, grid: { color: "#1e1e30" } },
+        y: { ticks: { color: "#555570", font: { size: 11 } }, grid: { color: "#1e1e30" } },
+      }
+    }
+  });
+}
+
+function setText(id, val) { document.getElementById(id).textContent = val; }
+function setChange(id, val, positive = true) {
+  const el = document.getElementById(id);
+  el.textContent = val + " 전기간 대비";
+  el.className = "card-change " + (positive ? "up" : "down");
+}
+
+init();
+</script>
+</body>
+</html>
